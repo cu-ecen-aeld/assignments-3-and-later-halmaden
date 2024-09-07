@@ -9,6 +9,7 @@ NUMLINES=0
 
 
 
+
 if [ -z $FILESDIR ] 
 then
 	echo "The first argument is required (a directory name)"

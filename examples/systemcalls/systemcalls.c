@@ -1,4 +1,12 @@
 #include "systemcalls.h"
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <libgen.h>
+
+#define _XOPEN_SOURCE
 
 /**
  * @param cmd the command to execute with system()
@@ -16,7 +24,11 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
-
+	int retval;
+	
+	retval = system( cmd);
+	if (retval == -1) 
+		return false;
     return true;
 }
 
@@ -36,6 +48,11 @@ bool do_system(const char *cmd)
 
 bool do_exec(int count, ...)
 {
+   
+    int status;
+    pid_t pid, w_pid;
+    
+    
     va_list args;
     va_start(args, count);
     char * command[count+1];
@@ -47,7 +64,7 @@ bool do_exec(int count, ...)
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
-    command[count] = command[count];
+    //command[count] = command[count];
 
 /*
  * TODO:
@@ -58,12 +75,64 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
+	//path = command[0];
+	//command[0]=command[1];
+	
+	
+ 	// get the program name
+ 	char *ename = basename(command[0]);
+ 	
+ 	//prepare new argv list for execv
+	char *argv[count+1 ];
+	argv[0]=ename; // first element is the program name 
+	
+	//printf("path = %s\n",command[0]);
+	//printf("ename = %s\n",argv[0]);
+	
+	for(i=1; i <= count; i++)// including the null at the end
+	{
+		 argv[i] = command[i];
+		 //printf("argv[%d]=%s\n",i,argv[i]);
+	}
+ 			
 
-    va_end(args);
+	
+	pid = fork();
+	
+	if (pid ==-1)
+		return false;
+	
+	else if (pid == 0){
+	 // child
+	 	
 
-    return true;
+	 		
+	 	if(execv(command[0],argv) == -1){
+	 			
+	 		//printf("aborting...\n");
+	 		abort();
+	 	}
+	}
+	
+	// upto here means parent
+	w_pid=waitpid(pid, &status, 0);
+	//w_pid=wait(&status);
+	
+	if (w_pid == -1) 
+		return false;	
+	else if(WIFEXITED(status)){// normal termination but still the command inside execv may have failed
+		if( WEXITSTATUS(status)!=0)
+			return false;
+		else 
+			return true;
+	}
+	
+	else if(WIFSIGNALED(status))	
+		return false;
+	
+	va_end(args);
+	return true;
 }
-
 /**
 * @param outputfile - The full path to the file to write with command output.
 *   This file will be closed at completion of the function call.
@@ -71,6 +140,11 @@ bool do_exec(int count, ...)
 */
 bool do_exec_redirect(const char *outputfile, int count, ...)
 {
+	
+	 
+    int status;
+    pid_t pid, w_pid;
+	
     va_list args;
     va_start(args, count);
     char * command[count+1];
@@ -92,6 +166,70 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
+	
+	// get the program name
+ 	char *ename = basename(command[0]);
+ 	
+ 	//prepare new argv list for execv
+	char *argv[count+1 ];
+	argv[0]=ename; // first element is the program name 
+	
+	//printf("path = %s\n",command[0]);
+	//printf("ename = %s\n",argv[0]);
+	
+	for(i=1; i <= count; i++)// including the null at the end
+	{
+		 argv[i] = command[i];
+		 //printf("argv[%d]=%s\n",i,argv[i]);
+	}
+ 			
+
+	
+	pid = fork();
+	
+	if (pid ==-1)
+		return false;
+	
+	else if (pid == 0){
+	 // child
+	 	
+		int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+		if (fd < 0) { perror("open"); exit(-1); }
+		if (dup2(fd, 1) < 0) { perror("dup2"); exit(-1); }
+		close(fd);
+    
+	 		
+	 	if(execv(command[0],argv) == -1){
+	 			
+	 		//printf("aborting...\n");
+	 		abort();
+	 	}
+	}
+	
+	// upto here means parent
+	w_pid=waitpid(pid, &status, 0);
+	//w_pid=wait(&status);
+	
+	if (w_pid == -1) 
+		return false;	
+	else if(WIFEXITED(status)){// normal termination but still the command inside execv may have failed
+		if( WEXITSTATUS(status)!=0)
+			return false;
+		else 
+			return true;
+	}
+	
+	else if(WIFSIGNALED(status))	
+		return false;
+	
+
+
+
+
+
+
+
+
 
     va_end(args);
 
